@@ -37,6 +37,8 @@ const char PALETTE[32] = {
   0x0d,0x27,0x2a	// sprite palette 3
 };
 
+const char* bullet1 = "- This is a bullet point";
+
 // setup PPU and tables
 void setup_graphics() {
   // clear sprites
@@ -49,8 +51,10 @@ void main(void)
 {
   setup_graphics();
   // draw message  
-  vram_adr(NTADR_A(2,2));
-  vram_write("HELLO, WORLD! (TEST)", 20);
+  vram_adr(NTADR_A(2,2));  
+  vram_write(bullet1, strlen(bullet1));
+  vram_adr(NTADR_A(2,4));  
+  vram_write(bullet1, strlen(bullet1));
   // enable rendering
   ppu_on_all();
   // infinite loop
