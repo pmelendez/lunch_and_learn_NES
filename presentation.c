@@ -1,19 +1,10 @@
-
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
-#include <stdlib.h>
-#include <string.h>
 
 // include NESLIB header
 #include "neslib.h"
-
-// include CC65 NES Header (PPU)
-#include <nes.h>
-
-// link the pattern table into CHR ROM
-//#link "chr_generic.s"
-
 // BCD arithmetic support
 #include "bcd.h"
 //#link "bcd.c"
@@ -21,6 +12,19 @@
 // VRAM update buffer
 #include "vrambuf.h"
 //#link "vrambuf.c"
+
+// include CC65 NES Header (PPU)
+#include <nes.h>
+
+extern const byte build_logo[];
+extern const byte cover[];
+extern const byte slide_background[];
+
+// link the pattern table into CHR ROM
+//#link "chr_generic.s"
+//#link "build_logo.s"
+//#link "slide_background.s"
+
 
 /*{pal:"nes",layout:"nes"}*/
 const char PALETTE[32] = { 
@@ -37,7 +41,18 @@ const char PALETTE[32] = {
   0x0d,0x27,0x2a	// sprite palette 3
 };
 
-const char* bullet1 = "- This is a bullet point";
+const int number_slides = 6;
+const char* header = "Making Games For The NES";
+
+const char* slide1[] = { "Agenda:", " ", "- What's the NES", "- Why", "- Components", "- Tools", "- Questions", "- Live demo (maybe?)", "" };
+const char* slide2[] = { "What's the NES:", " ", "- History", "- 6502 CPU", "" };
+const char* slide3[] = { "Why:", " ", "- Curiosity", "- Understanding Low Level", "- Fun", "" };
+const char* slide4[] = { "Components:", " ", "- CPU, PPU, APU", "- Tables:", "  \xba\xbbNameTables", "  \xba\xbbPattern Tables", "  \xba\xbb""Attribute Tables", "- Sprites and Metasprites", "" };
+const char* slide5[] = { "Tools:", " ", "- 8BitWorkshop.com", "- NES Screen Tool", "- FamiTracker", "" };
+const char* slide6[] = { " ", " ", "QUESTIONS?", "" };
+
+const char** slides[] = { slide1, slide2, slide3, slide4, slide5, slide6 };
+
 
 // setup PPU and tables
 void setup_graphics() {
@@ -47,17 +62,109 @@ void setup_graphics() {
   pal_all(PALETTE);
 }
 
-void main(void)
-{
-  setup_graphics();
-  // draw message  
-  vram_adr(NTADR_A(2,2));  
-  vram_write(bullet1, strlen(bullet1));
-  vram_adr(NTADR_A(2,4));  
-  vram_write(bullet1, strlen(bullet1));
+void show_title_screen(const byte* pal, const byte* rle) {
+  
+  // disable rendering
+  ppu_off();
+  // set palette, virtual bright to 0 (total black)
+  pal_bg(pal);
+  pal_bright(3);
+  // unpack nametable into the VRAM
+  vram_adr(NAMETABLE_A);
+  vram_unrle(rle);
   // enable rendering
   ppu_on_all();
+  // fade in from black
+  //fade_in();
+}
+
+void build_slide(int slide_index)
+{
+  const char** slide = slides[slide_index-1];
+  int i;
+  
+  for (i = 0; slide[i] != ""; i++)
+  {
+    vram_adr(NTADR_A(4, 8 + i*2));  
+    vram_write(slide[i], strlen(slide[i]));
+  }
+  
+}
+
+void show_slide(int slide)
+{
+  char title[10]; 
+  ppu_off();
+  pal_bg(PALETTE);
+  pal_bright(3);
+  vram_adr(NAMETABLE_A);
+  vram_fill(0x0, 64*8*8);
+  //vram_unrle(slide_background);
+  
+  //header
+  vram_adr(NTADR_B(1,2));  
+  vram_write(header, strlen(header));
+  
+  //build slide
+  build_slide(slide);
+  
+  //footer
+  sprintf(title, "Slide# %d", slide);
+  vram_adr(NTADR_B(54,25));  
+  vram_write(title, strlen(title));
+  ppu_on_all();
+}
+
+void draw_slide(const char i)
+{
+  if(i == 0)
+  {
+    show_title_screen(PALETTE, build_logo);
+    return;
+  }
+  
+  show_slide(i);
+  ppu_wait_frame();
+}
+
+void main(void)
+{
+  char pad;
+  int slide=0;
+  setup_graphics();
+  
+  // enable rendering
+  
+  draw_slide(slide);
+  
+  ppu_on_all();
+
   // infinite loop
   while(1) {
+    pad_trigger(0);
+    ppu_wait_frame();
+    ppu_wait_frame();
+    pad = pad_state(0);
+    
+    if(pad&PAD_LEFT)
+    {
+      slide--;
+      if(slide < 0)
+      {
+        slide = 0;
+      }
+      draw_slide(slide);
+    }
+    
+    if(pad&PAD_RIGHT)
+    {
+      slide++;
+      if(slide > number_slides)
+      {
+        slide = number_slides;
+      }
+      
+      draw_slide(slide);
+    }
   }
 }
