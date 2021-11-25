@@ -20,11 +20,25 @@ extern const byte build_logo[];
 extern const byte cover[];
 extern const byte slide_background[];
 
+//#link "famitone2.s"
+void __fastcall__ famitone_update(void);
+
 // link the pattern table into CHR ROM
 //#link "chr_generic.s"
 //#link "build_logo.s"
 //#link "slide_background.s"
+//#link "sounds_effects.s"
+extern const void sound_data[];
 
+//#link "music.s"
+
+extern const void music_data[];
+
+
+#define SFX_START    0
+#define SFX_ITEM    1
+#define SFX_RESPAWN1  2
+#define SFX_RESPAWN2  3
 
 /*{pal:"nes",layout:"nes"}*/
 const char PALETTE[32] = { 
@@ -44,11 +58,20 @@ const char PALETTE[32] = {
 const int number_slides = 6;
 const char* header = "Making Games For The NES";
 
-const char* slide1[] = { "Agenda:", " ", "- What's the NES", "- Why", "- Components", "- Tools", "- Questions", "- Live demo (maybe?)", "" };
-const char* slide2[] = { "What's the NES:", " ", "- History", "- 6502 CPU", "" };
-const char* slide3[] = { "Why:", " ", "- Curiosity", "- Understanding Low Level", "- Fun", "" };
-const char* slide4[] = { "Components:", " ", "- CPU, PPU, APU", "- Tables:", "  \xba\xbbNameTables", "  \xba\xbbPattern Tables", "  \xba\xbb""Attribute Tables", "- Sprites and Metasprites", "" };
-const char* slide5[] = { "Tools:", " ", "- 8BitWorkshop.com", "- NES Screen Tool", "- FamiTracker", "" };
+const char* slide1[] = { "Agenda:", " ", "- What's the NES", 
+                        "- Why", "- Components", "- Tools", 
+                        "- Questions", "- Live demo (maybe?)", "" };
+const char* slide2[] = { "What's the NES:", " ", 
+                        "- History", "- 6502 CPU", 
+                        "" };
+const char* slide3[] = { "Why:", " ", 
+                        "- Curiosity", "- Understanding Low Level", 
+                        "- Fun", "" };
+const char* slide4[] = { "Components:", " ", "- CPU, PPU, APU", 
+                        "- Tables:", "  \xba\xbbNameTables", "  \xba\xbbPattern Tables", 
+                        "  \xba\xbb""Attribute Tables", "- Sprites and Metasprites", "" };
+const char* slide5[] = { "Tools:", " ", "- 8BitWorkshop.com", "- NES Screen Tool", 
+                        "- FamiTracker", "" };
 const char* slide6[] = { " ", " ", "QUESTIONS?", "" };
 
 const char** slides[] = { slide1, slide2, slide3, slide4, slide5, slide6 };
@@ -62,20 +85,38 @@ void setup_graphics() {
   pal_all(PALETTE);
 }
 
+void fade_in() {
+  byte vb;
+  
+  for (vb=0; vb<=3; vb++) {
+    ppu_wait_frame();
+    ppu_wait_frame();
+    // set virtual bright value
+    pal_bright(vb);
+    // wait for 4/60 sec
+    ppu_wait_frame();
+    ppu_wait_frame();
+    ppu_wait_frame();
+    ppu_wait_frame();
+  }
+  
+}
+
 void show_title_screen(const byte* pal, const byte* rle) {
   
   // disable rendering
   ppu_off();
   // set palette, virtual bright to 0 (total black)
   pal_bg(pal);
-  pal_bright(3);
+  pal_bright(0);
   // unpack nametable into the VRAM
   vram_adr(NAMETABLE_A);
   vram_unrle(rle);
   // enable rendering
   ppu_on_all();
   // fade in from black
-  //fade_in();
+  fade_in();
+  sfx_play(SFX_START,1);
 }
 
 void build_slide(int slide_index)
@@ -112,6 +153,15 @@ void show_slide(int slide)
   sprintf(title, "Slide# %d", slide);
   vram_adr(NTADR_B(54,25));  
   vram_write(title, strlen(title));
+  
+  if(slide <6) 
+  {
+    sfx_play(SFX_RESPAWN2,1);
+  }
+  else
+  {
+    sfx_play(SFX_ITEM,1);
+  }
   ppu_on_all();
 }
 
@@ -124,7 +174,15 @@ void draw_slide(const char i)
   }
   
   show_slide(i);
+  
   ppu_wait_frame();
+}
+
+void setup_sounds()
+{
+  famitone_init(&music_data);
+  sfx_init(&sound_data);
+  nmi_set_callback(famitone_update);
 }
 
 void main(void)
@@ -132,6 +190,7 @@ void main(void)
   char pad;
   int slide=0;
   setup_graphics();
+  setup_sounds();
   
   // enable rendering
   
